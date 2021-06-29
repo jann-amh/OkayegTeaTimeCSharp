@@ -7,12 +7,16 @@ using OkayegTeaTimeCSharp.HttpRequests;
 using OkayegTeaTimeCSharp.Messages;
 using OkayegTeaTimeCSharp.Properties;
 using OkayegTeaTimeCSharp.Spotify;
-using OkayegTeaTimeCSharp.Time;
-using OkayegTeaTimeCSharp.Utils;
+using Sterbehilfe.Emojis;
+using Sterbehilfe.Numbers;
+using Sterbehilfe.Strings;
+using Sterbehilfe.Time;
+using Sterbehilfe.Time.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TwitchLib.Client.Models;
+using StrbhRand = Sterbehilfe.Randoms;
 
 namespace OkayegTeaTimeCSharp.Twitch.Bot
 {
@@ -62,14 +66,6 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             }
         }
 
-        public static void FillLastMessagesDictionary()
-        {
-            Config.GetChannels().ForEach(channel =>
-            {
-                TwitchBot.LastMessages.Add($"#{channel}", "");
-            });
-        }
-
         public static string GetReminderAuthor(string toUser, string fromUser)
         {
             return toUser == fromUser ? "yourself" : fromUser;
@@ -94,11 +90,33 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
         {
             try
             {
-                List<HttpRequests.Emote> emotes = chatMessage.GetSplit().Length > 2 ? HttpRequest.Get7TVEmotes(chatMessage.Channel, chatMessage.GetLowerSplit()[2].ToInt()) : HttpRequest.Get7TVEmotes(chatMessage.Channel);
+                List<HttpRequests.Emote> emotes;
+                if (chatMessage.GetLowerSplit().Length >= 4)
+                {
+                    if (chatMessage.GetLowerSplit()[2].IsMatch(@"\w+"))
+                    {
+                        emotes = HttpRequest.Get7TVEmotes(chatMessage.GetLowerSplit()[2], chatMessage.GetLowerSplit()[3].ToInt());
+                    }
+                    else
+                    {
+                        emotes = HttpRequest.Get7TVEmotes(chatMessage.Channel, chatMessage.GetLowerSplit()[3].ToInt());
+                    }
+                }
+                else
+                {
+                    if (chatMessage.GetLowerSplit()[2].IsMatch(@"\w+"))
+                    {
+                        emotes = HttpRequest.Get7TVEmotes(chatMessage.GetLowerSplit()[2]);
+                    }
+                    else
+                    {
+                        emotes = HttpRequest.Get7TVEmotes(chatMessage.Channel);
+                    }
+                }
                 string emoteString = string.Empty;
                 emotes.ForEach(e =>
                 {
-                    emoteString += $"{e.Name} | ";
+                    emoteString += $"{e} | ";
                 });
                 twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, recently added emotes: {emoteString.Trim()[..^2]}");
             }
@@ -112,11 +130,33 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
         {
             try
             {
-                List<HttpRequests.Emote> emotes = chatMessage.GetSplit().Length > 2 ? HttpRequest.GetBTTVEmotes(chatMessage.Channel, chatMessage.GetLowerSplit()[2].ToInt()) : HttpRequest.GetBTTVEmotes(chatMessage.Channel);
+                List<HttpRequests.Emote> emotes;
+                if (chatMessage.GetLowerSplit().Length >= 4)
+                {
+                    if (chatMessage.GetLowerSplit()[2].IsMatch(@"\w+"))
+                    {
+                        emotes = HttpRequest.GetBTTVEmotes(chatMessage.GetLowerSplit()[2], chatMessage.GetLowerSplit()[3].ToInt());
+                    }
+                    else
+                    {
+                        emotes = HttpRequest.GetBTTVEmotes(chatMessage.Channel, chatMessage.GetLowerSplit()[3].ToInt());
+                    }
+                }
+                else
+                {
+                    if (chatMessage.GetLowerSplit()[2].IsMatch(@"\w+"))
+                    {
+                        emotes = HttpRequest.GetBTTVEmotes(chatMessage.GetLowerSplit()[2]);
+                    }
+                    else
+                    {
+                        emotes = HttpRequest.GetBTTVEmotes(chatMessage.Channel);
+                    }
+                }
                 string emoteString = string.Empty;
                 emotes.ForEach(e =>
                 {
-                    emoteString += $"{e.Name} | ";
+                    emoteString += $"{e} | ";
                 });
                 twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, recently added emotes: {emoteString.Trim()[..^2]}");
             }
@@ -159,7 +199,9 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
                 User user = DataBase.GetUser(username);
                 if (user.IsAfk == "true")
                 {
-                    twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {AfkMessage.Create(user).GoingAway}: {user.MessageText.Decode()}");
+                    string message = $"{chatMessage.Username}, {AfkMessage.Create(user).GoingAway}";
+                    message += user.MessageText.Decode().Length > 0 ? $": {user.MessageText.Decode()} ({TimeHelper.ConvertMillisecondsToPassedTime(user.Time, "ago", ConversionType.YearDayHourMin)})" : $" ({TimeHelper.ConvertMillisecondsToPassedTime(user.Time, "ago", ConversionType.YearDayHourMin)})";
+                    twitchBot.Send(chatMessage.Channel, message);
                 }
                 else
                 {
@@ -174,8 +216,13 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
 
         public static void SendCoinFlip(this TwitchBot twitchBot, ChatMessage chatMessage)
         {
-            string result = NumberHelper.Random(0, 1) == 0 ? "yes/heads" : "no/tails";
+            string result = StrbhRand.Random.Int(0, 100) >= 50 ? "yes/heads" : "no/tails";
             twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {result} {Emoji.Coin}");
+        }
+
+        public static void SendColor(this TwitchBot twitchBot, ChatMessage chatMessage, string username)
+        {
+#warning needs implementation
         }
 
         public static void SendComingBack(this TwitchBot twitchBot, User user, ChatMessage chatMessage)
@@ -202,15 +249,46 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             }
         }
 
+        public static void SendDetectedSpotifyURI(this TwitchBot twitchBot, ChatMessage chatMessage)
+        {
+            (bool isMatch, string uri) = new LinkRecognizer(chatMessage).FindSpotifyLink();
+            if (isMatch)
+            {
+                twitchBot.Send(chatMessage.Channel, $"{uri}");
+            }
+        }
+
         public static void SendFFZEmotes(this TwitchBot twitchBot, ChatMessage chatMessage)
         {
             try
             {
-                List<HttpRequests.Emote> emotes = chatMessage.GetSplit().Length > 2 ? HttpRequest.GetFFZEmotes(chatMessage.Channel, chatMessage.GetLowerSplit()[2].ToInt()) : HttpRequest.GetFFZEmotes(chatMessage.Channel);
+                List<HttpRequests.Emote> emotes;
+                if (chatMessage.GetLowerSplit().Length >= 4)
+                {
+                    if (chatMessage.GetLowerSplit()[2].IsMatch(@"\w+"))
+                    {
+                        emotes = HttpRequest.GetFFZEmotes(chatMessage.GetLowerSplit()[2], chatMessage.GetLowerSplit()[3].ToInt());
+                    }
+                    else
+                    {
+                        emotes = HttpRequest.GetFFZEmotes(chatMessage.Channel, chatMessage.GetLowerSplit()[3].ToInt());
+                    }
+                }
+                else
+                {
+                    if (chatMessage.GetLowerSplit()[2].IsMatch(@"\w+"))
+                    {
+                        emotes = HttpRequest.GetFFZEmotes(chatMessage.GetLowerSplit()[2]);
+                    }
+                    else
+                    {
+                        emotes = HttpRequest.GetFFZEmotes(chatMessage.Channel);
+                    }
+                }
                 string emoteString = string.Empty;
                 emotes.ForEach(e =>
                 {
-                    emoteString += $"{e.Name} | ";
+                    emoteString += $"{e} | ";
                 });
                 twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, recently added emotes: {emoteString.Trim()[..^2]}");
             }
@@ -220,12 +298,43 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             }
         }
 
+        public static void SendFill(this TwitchBot twitchBot, ChatMessage chatMessage)
+        {
+            string message = string.Empty;
+            if (chatMessage.GetSplit()[1].IsMatch(@"rand(om)?"))
+            {
+                message += (char)StrbhRand::Random.Int(0, ushort.MaxValue);
+                while (message.Length + 2 <= Config.MaxMessageLength)
+                {
+                    message += $" {(char)StrbhRand.Random.Int(0, ushort.MaxValue)}";
+                }
+            }
+            else
+            {
+                string[] emotes = chatMessage.GetMessage()[(chatMessage.GetSplit()[0].Length + 1)..].Split();
+                message += emotes[StrbhRand.Random.Int(0, emotes.Length - 1)];
+                while (true)
+                {
+                    string emote = emotes[StrbhRand.Random.Int(0, emotes.Length - 1)];
+                    if ((message + $" {emote}").Length <= Config.MaxMessageLength)
+                    {
+                        message += $" {emote}";
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+            twitchBot.TwitchClient.SendMessage(chatMessage.Channel, message);
+        }
+
         public static void SendFirst(this TwitchBot twitchBot, ChatMessage chatMessage)
         {
             try
             {
                 Message message = DataBase.GetFirst(chatMessage);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -238,7 +347,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetFirstChannel(chatMessage, channel);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -251,7 +360,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetFirstUser(username);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -264,12 +373,22 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetFirstMessageUserChannel(username, channel);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
                 twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {ex.Message}");
             }
+        }
+
+        public static void SendFuck(this TwitchBot twitchBot, ChatMessage chatMessage)
+        {
+            string message = $"{Emoji.PointRight} {Emoji.OkHand} {chatMessage.Username} fucked {chatMessage.GetSplit()[1]}";
+            if (chatMessage.GetSplit().Length > 2)
+            {
+                message += $" {chatMessage.GetSplit()[2]}";
+            }
+            twitchBot.Send(chatMessage.Channel, message);
         }
 
         public static void SendGoingAfk(this TwitchBot twitchBot, ChatMessage chatMessage, AfkCommandType type)
@@ -309,27 +428,34 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, logging {new DottedNumber(database.CountUserMessages(username))} messages of {username}");
         }
 
-        public static void SendMassping(this TwitchBot twitchBot, ChatMessage chatMessage, string emote = null)
+        public static void SendMassping(this TwitchBot twitchBot, ChatMessage chatMessage, string emote = "Okayeg")
         {
-            emote ??= "Okayeg";
-            string message = emote;
-            List<string> chatters;
-
-            if (chatMessage.Channel != Resources.SecretOfflineChat)
+            if (chatMessage.IsModOrBroadcaster())
             {
-                chatters = HttpRequest.GetChatters(chatMessage.Channel);
-                chatters.Remove(chatMessage.Username);
+                string message = emote;
+                List<string> chatters;
+
+                if (chatMessage.Channel != Resources.SecretOfflineChat)
+                {
+                    chatters = HttpRequest.GetChatters(chatMessage.Channel);
+                    chatters.Remove(chatMessage.Username);
+                }
+                else
+                {
+                    message = $"{emote} OkayegTeaTime {emote}";
+                    chatters = Resources.SecretOfflineChatEmotes.Split().ToList();
+                }
+
+                chatters.ForEach(c =>
+                {
+                    message += $" {c} {emote}";
+                });
+                twitchBot.TwitchClient.SendMessage(chatMessage.Channel, message);
             }
             else
             {
-                chatters = Resources.SecretOfflineChatEmotes.Split().ToList();
+                twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, you aren't a mod or the broadcaster");
             }
-
-            chatters.ForEach(c =>
-            {
-                message += $" {c} {emote}";
-            });
-            twitchBot.TwitchClient.SendMessage(chatMessage.Channel, message);
         }
 
         public static void SendMathResult(this TwitchBot twitchBot, ChatMessage chatMessage)
@@ -340,7 +466,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
         public static void SendRandomCookie(this TwitchBot twitchBot, ChatMessage chatMessage)
         {
             Pechkekse keks = DataBase.GetRandomCookie();
-            twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {keks.Message}");
+            twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {keks.Message} {Emoji.Cookie}");
         }
 
         public static void SendRandomGachi(this TwitchBot twitchBot, ChatMessage chatMessage)
@@ -354,7 +480,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message randomMessage = DataBase.GetRandomMessage(chatMessage);
-                twitchBot.Send(chatMessage.Channel, $"({TimeHelper.ConvertMillisecondsToPassedTime(randomMessage.Time, "ago")}) {randomMessage.Username}: {randomMessage.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({TimeHelper.ConvertMillisecondsToPassedTime(randomMessage.Time, "ago", ConversionType.YearDayHour)}) {randomMessage.Username}: {randomMessage.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -367,7 +493,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message randomMessage = DataBase.GetRandomMessage(username);
-                twitchBot.Send(chatMessage.Channel, $"({randomMessage.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(randomMessage.Time, "ago")}) {randomMessage.Username}: {randomMessage.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({randomMessage.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(randomMessage.Time, "ago", ConversionType.YearDayHour)}) {randomMessage.Username}: {randomMessage.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -380,7 +506,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message randomMessage = DataBase.GetRandomMessage(username, channel);
-                twitchBot.Send(chatMessage.Channel, $"({randomMessage.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(randomMessage.Time, "ago")}) {randomMessage.Username}: {randomMessage.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({randomMessage.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(randomMessage.Time, "ago", ConversionType.YearDayHour)}) {randomMessage.Username}: {randomMessage.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -440,7 +566,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetSearch(keyword);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -453,7 +579,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetSearchChannel(keyword, channel);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -466,7 +592,7 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetSearchUser(keyword, username);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
@@ -479,12 +605,19 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             try
             {
                 Message message = DataBase.GetSearchUserChannel(keyword, username, channel);
-                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago")}) {message.Username}: {message.MessageText.Decode()}");
+                twitchBot.Send(chatMessage.Channel, $"({message.Channel} | {TimeHelper.ConvertMillisecondsToPassedTime(message.Time, "ago", ConversionType.YearDayHour)}) {message.Username}: {message.MessageText.Decode()}");
             }
             catch (MessageNotFoundException ex)
             {
                 twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {ex.Message}");
             }
+        }
+
+        public static void SendSetEmoteInFront(this TwitchBot twitchBot, ChatMessage chatMessage, string emote)
+        {
+            DataBase.SetEmoteInFront(chatMessage.Channel, emote);
+            twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, emote set to: {emote}");
+            EmoteInFrontHelper.Update(chatMessage.Channel, emote);
         }
 
         public static void SendSetPrefix(this TwitchBot twitchBot, ChatMessage chatMessage, string prefix)
@@ -502,16 +635,30 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
 
         public static void SendSetReminder(this TwitchBot twitchBot, ChatMessage chatMessage, byte[] message)
         {
-            string target = chatMessage.GetLowerSplit()[1] == "me" ? chatMessage.Username : chatMessage.GetLowerSplit()[1];
-            int id = DataBase.AddReminder(new(chatMessage.Username, target, message, $"#{chatMessage.Channel}"));
-            twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, set a reminder for {GetReminderTarget(target, chatMessage.Username)} (ID: {id})");
+            try
+            {
+                string target = chatMessage.GetLowerSplit()[1] == "me" ? chatMessage.Username : chatMessage.GetLowerSplit()[1];
+                int id = DataBase.AddReminder(new(chatMessage.Username, target, message, $"#{chatMessage.Channel}"));
+                twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, set a reminder for {GetReminderTarget(target, chatMessage.Username)} (ID: {id})");
+            }
+            catch (TooManyReminderException ex)
+            {
+                twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {ex.Message}");
+            }
         }
 
         public static void SendSetTimedReminder(this TwitchBot twitchBot, ChatMessage chatMessage, byte[] message, long toTime)
         {
-            string target = chatMessage.GetLowerSplit()[1] == "me" ? chatMessage.Username : chatMessage.GetLowerSplit()[1];
-            int id = DataBase.AddReminder(new(chatMessage.Username, target, message, $"#{chatMessage.Channel}", toTime + TimeHelper.Now()));
-            twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, set a timed reminder for {GetReminderTarget(target, chatMessage.Username)} (ID: {id})");
+            try
+            {
+                string target = chatMessage.GetLowerSplit()[1] == "me" ? chatMessage.Username : chatMessage.GetLowerSplit()[1];
+                int id = DataBase.AddReminder(new(chatMessage.Username, target, message, $"#{chatMessage.Channel}", toTime + TimeHelper.Now()));
+                twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, set a timed reminder for {GetReminderTarget(target, chatMessage.Username)} (ID: {id})");
+            }
+            catch (TooManyReminderException ex)
+            {
+                twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, {ex.Message}");
+            }
         }
 
         public static void SendSpotifyCurrentlyPlaying(this TwitchBot twitchBot, ChatMessage chatMessage)
@@ -536,6 +683,13 @@ namespace OkayegTeaTimeCSharp.Twitch.Bot
             {
                 twitchBot.Send(reminder.Channel, $"{reminder.ToUser}, reminder from {GetReminderTarget(reminder.ToUser, reminder.FromUser)} ({TimeHelper.ConvertMillisecondsToPassedTime(reminder.Time, "ago")})");
             }
+        }
+
+        public static void SendUnsetEmoteInFront(this TwitchBot twitchBot, ChatMessage chatMessage)
+        {
+            DataBase.UnsetEmoteInFront(chatMessage.Channel);
+            twitchBot.Send(chatMessage.Channel, $"{chatMessage.Username}, unset emote");
+            EmoteInFrontHelper.Update(chatMessage.Channel, null);
         }
 
         public static void SendUnsetPrefix(this TwitchBot twitchBot, ChatMessage chatMessage)

@@ -6,17 +6,17 @@ using TwitchLib.Client.Models;
 
 namespace OkayegTeaTimeCSharp.Commands.CommandClasses
 {
-    public static class MasspingCommand
+    public static class ChattersCommand
     {
         public static void Handle(TwitchBot twitchBot, ChatMessage chatMessage, string alias)
         {
-            if (chatMessage.GetMessage().IsMatch(PatternCreator.Create(alias, PrefixHelper.GetPrefix(chatMessage.Channel), @"\s\S+")))
+            if (chatMessage.GetMessage().IsMatch(PatternCreator.Create(alias, PrefixHelper.GetPrefix(chatMessage.Channel), @"\s#?\w+")))
             {
-                twitchBot.SendMassping(chatMessage, chatMessage.GetSplit()[1]);
+                twitchBot.SendChattersCount(chatMessage, chatMessage.GetLowerSplit()[1]);
             }
             else if (chatMessage.GetMessage().IsMatch(PatternCreator.Create(alias, PrefixHelper.GetPrefix(chatMessage.Channel))))
             {
-                twitchBot.SendMassping(chatMessage);
+                twitchBot.SendChattersCount(chatMessage, chatMessage.Channel);
             }
         }
     }

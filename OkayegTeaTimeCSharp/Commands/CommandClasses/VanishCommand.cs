@@ -7,6 +7,7 @@ using OkayegTeaTimeCSharp.Commands.CommandEnums;
 using OkayegTeaTimeCSharp.Twitch;
 using OkayegTeaTimeCSharp.Twitch.Bot;
 using TwitchLib.Client.Models;
+using TwitchLib.Client.Extensions;
 
 
 namespace OkayegTeaTimeCSharp.Commands.CommandClasses
@@ -15,7 +16,7 @@ namespace OkayegTeaTimeCSharp.Commands.CommandClasses
     {
         public static void Handle(TwitchBot twitchBot, ChatMessage chatMessage, string alias)
         {
-            twitchBot.Send(chatMessage.Channel, $"/timeout {chatMessage.Username} 1");
+            twitchBot.TwitchClient.TimeoutUser(chatMessage.Channel, chatMessage.Username, TimeSpan.FromSeconds(1));
         }
     }
 }
