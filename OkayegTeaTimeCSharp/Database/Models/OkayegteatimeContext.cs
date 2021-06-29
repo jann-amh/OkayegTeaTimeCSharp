@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OkayegTeaTimeCSharp.Properties;
+using System.IO;
 
 #nullable disable
 
@@ -18,6 +19,7 @@ namespace OkayegTeaTimeCSharp.Database.Models
 
         public virtual DbSet<Bot> Bots { get; set; }
         public virtual DbSet<Gachi> Gachi { get; set; }
+        public virtual DbSet<EmoteInFront> EmoteInFronts { get; set; }
         public virtual DbSet<Message> Messages { get; set; }
         public virtual DbSet<Nuke> Nukes { get; set; }
         public virtual DbSet<Pechkekse> Pechkekse { get; set; }
@@ -33,7 +35,7 @@ namespace OkayegTeaTimeCSharp.Database.Models
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseMySQL(Resources.MySqlConnectionString);
+                optionsBuilder.UseMySQL(File.ReadAllText(Resources.ConnectionStringPath));
             }
         }
 
@@ -57,6 +59,21 @@ namespace OkayegTeaTimeCSharp.Database.Models
                 entity.Property(e => e.Username)
                     .IsRequired()
                     .HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<EmoteInFront>(entity =>
+            {
+                entity.ToTable("emoteInFront");
+
+                entity.Property(e => e.Id).HasColumnType("int(11)");
+
+                entity.Property(e => e.Channel)
+                    .HasMaxLength(50)
+                    .HasDefaultValueSql("'NULL'");
+
+                entity.Property(e => e.Emote)
+                    .HasMaxLength(50)
+                    .HasDefaultValueSql("'NULL'");
             });
 
             modelBuilder.Entity<Gachi>(entity =>
@@ -86,7 +103,7 @@ namespace OkayegTeaTimeCSharp.Database.Models
 
                 entity.Property(e => e.MessageText)
                     .IsRequired()
-                    .HasMaxLength(500);
+                    .HasMaxLength(2000);
 
                 entity.Property(e => e.Time).HasColumnType("bigint(20)");
 
@@ -115,7 +132,7 @@ namespace OkayegTeaTimeCSharp.Database.Models
 
                 entity.Property(e => e.Word)
                     .IsRequired()
-                    .HasMaxLength(250);
+                    .HasMaxLength(1000);
             });
 
             modelBuilder.Entity<Pechkekse>(entity =>
@@ -140,8 +157,10 @@ namespace OkayegTeaTimeCSharp.Database.Models
                     .HasMaxLength(50);
 
                 entity.Property(e => e.PrefixString)
-                    .HasMaxLength(10)
-                    .HasColumnName("Prefix");
+                    .HasMaxLength(50)
+                    .HasMaxLength(1000)
+                    .HasColumnName("Prefix")
+                    .HasDefaultValueSql("'NULL'");
             });
 
             modelBuilder.Entity<Quote>(entity =>
@@ -183,7 +202,7 @@ namespace OkayegTeaTimeCSharp.Database.Models
 
                 entity.Property(e => e.Message)
                     .IsRequired()
-                    .HasMaxLength(500);
+                    .HasMaxLength(2000);
 
                 entity.Property(e => e.Time).HasColumnType("bigint(20)");
 
@@ -232,7 +251,7 @@ namespace OkayegTeaTimeCSharp.Database.Models
 
                 entity.Property(e => e.Suggestion1)
                     .IsRequired()
-                    .HasMaxLength(500)
+                    .HasMaxLength(2000)
                     .HasColumnName("Suggestion");
 
                 entity.Property(e => e.Time).HasColumnType("bigint(20)");
@@ -256,11 +275,15 @@ namespace OkayegTeaTimeCSharp.Database.Models
                     .HasColumnName("IsAFK")
                     .HasDefaultValueSql("'false'");
 
-                entity.Property(e => e.MessageText).HasMaxLength(500);
+                entity.Property(e => e.MessageText)
+                    .HasMaxLength(2000)
+                    .HasDefaultValueSql("'NULL'");
 
                 entity.Property(e => e.Time).HasColumnType("bigint(20)");
 
-                entity.Property(e => e.Type).HasMaxLength(10);
+                entity.Property(e => e.Type)
+                    .HasMaxLength(10)
+                    .HasDefaultValueSql("'NULL'");
 
                 entity.Property(e => e.Username)
                     .IsRequired()

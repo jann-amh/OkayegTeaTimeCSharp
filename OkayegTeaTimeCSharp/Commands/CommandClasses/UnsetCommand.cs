@@ -1,6 +1,7 @@
 ﻿using OkayegTeaTimeCSharp.Twitch;
 using OkayegTeaTimeCSharp.Twitch.Bot;
 using OkayegTeaTimeCSharp.Utils;
+using Sterbehilfe.Strings;
 using TwitchLib.Client.Models;
 
 namespace OkayegTeaTimeCSharp.Commands.CommandClasses
@@ -16,6 +17,10 @@ namespace OkayegTeaTimeCSharp.Commands.CommandClasses
             else if (chatMessage.GetMessage().IsMatch(PatternCreator.Create(alias, PrefixHelper.GetPrefix(chatMessage.Channel), @"\sreminder\s\d+")))
             {
                 twitchBot.SendUnsetReminder(chatMessage);
+            }
+            else if (chatMessage.GetMessage().IsMatch(PatternCreator.Create(alias, PrefixHelper.GetPrefix(chatMessage.Channel), @"\semote")))
+            {
+                twitchBot.SendUnsetEmoteInFront(chatMessage);
             }
         }
     }

@@ -1,8 +1,8 @@
 ﻿using OkayegTeaTimeCSharp.Database;
 using OkayegTeaTimeCSharp.Database.Models;
 using OkayegTeaTimeCSharp.Properties;
-using OkayegTeaTimeCSharp.Time;
 using SpotifyAPI.Web;
+using Sterbehilfe.Time;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,7 +17,7 @@ namespace OkayegTeaTimeCSharp.Spotify
             if (new OkayegTeaTimeContext().Spotify.Any(s => s.Username == username))
             {
                 Database.Models.Spotify user = DataBase.GetSpotifyUser(username);
-                if (user.Time + new Hour().ToMilliseconds() <= TimeHelper.Now() + 5000)
+                if (user.Time + new Hour().ToMilliseconds() <= TimeHelper.Now() + new Second(5).ToMilliseconds())
                 {
                     await GetNewAccessToken(username);
                     user = DataBase.GetSpotifyUser(username);

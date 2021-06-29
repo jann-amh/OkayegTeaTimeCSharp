@@ -1,6 +1,8 @@
-﻿using OkayegTeaTimeCSharp.HttpRequests;
-using OkayegTeaTimeCSharp.Properties;
+﻿using OkayegTeaTimeCSharp.Properties;
+using Sterbehilfe.HttpRequests;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Web;
 using TwitchLib.Api.V5.Models.Channels;
 
@@ -20,7 +22,7 @@ namespace OkayegTeaTimeCSharp.Twitch.API
         public static string GetAccessToken()
         {
             HttpPost request = new("https://id.twitch.tv/oauth2/token",
-                new List<KeyValuePair<string, string>>()
+                new()
                 {
                     new("client_id", _api.Settings.ClientId),
                     new("client_secret", _api.Settings.Secret),
@@ -29,9 +31,22 @@ namespace OkayegTeaTimeCSharp.Twitch.API
             return request.Data.GetProperty("access_token").GetString();
         }
 
+        public static void RefreshAccessToken()
+        {
+            _api.Settings.AccessToken = GetAccessToken();
+        }
+
         public static Channel GetChannelByName(string channel)
         {
-            return _api.V5.Search.SearchChannelsAsync(HttpUtility.UrlEncode(channel), 1).Result.Channels[0];
+            List<Channel> channels = _api.V5.Search.SearchChannelsAsync(HttpUtility.UrlEncode(channel), 10).Result.Channels.ToList();
+            try
+            {
+                return channels.Where(c => c.Name == channel).FirstOrDefault();
+            }
+            catch (Exception)
+            {
+                return channels[0];
+            }
         }
 
         public static string GetChannelID(string channel)
